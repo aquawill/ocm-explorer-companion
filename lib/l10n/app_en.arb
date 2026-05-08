@@ -19,11 +19,11 @@
   "@allowHighwayTitle": {
     "description": "Route preferences switcher title"
   },
-  "appTitle": "HERE SDK for Flutter - Reference Application",
+  "appTitle": "OCM Explorer Companion",
   "@appTitle": {
     "description": "Title of the Application"
   },
-  "appTitleHeader": "HERE SDK Reference Application for Flutter '{{0}}'\nBased on HERE SDK '{{1}}'.'{{2}}'.'{{3}}'",
+  "appTitleHeader": "OCM Explorer Companion\n'{{0}}' · HERE SDK '{{1}}'.'{{2}}'.'{{3}}'",
   "@appTitleHeader": {
     "description": "Title of the Application in the drawer header"
   },
@@ -2053,7 +2053,7 @@
   "@Welcome": {
     "description": "Title for the FTU Welcome Dialog"
   },
-  "welcomeMessage": "and thanks for using the HERE SDK Reference Application for Flutter. Place your first time usage information here. \nFor your privacy notice please include the following text:\n",
+  "welcomeMessage": "Thanks for using OCM Explorer Companion.\nFor your privacy notice please include the following text:\n",
   "@welcomeMessage": {
     "description": "FTU Welcome Dialog message"
   },

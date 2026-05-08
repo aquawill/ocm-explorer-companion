@@ -31,6 +31,7 @@
 
 /* Begin PBXFileReference section */
 		0C6984022197CF17C15B0C1E /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		0F4C02012DC1F9B000C04801 /* Info-Profile.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Info-Profile.plist"; sourceTree = "<group>"; };
 		11CFF6FF26F09B560066F7F9 /* Info-Release.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Info-Release.plist"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -96,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				11CFF6FF26F09B560066F7F9 /* Info-Release.plist */,
+				0F4C02012DC1F9B000C04801 /* Info-Profile.plist */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -140,6 +142,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				7F4E79C12D2A4BC0801F2D44 /* Sign Native Asset Frameworks */,
 				CB98278FE3A10CAC870F61D0 /* [CP] Embed Pods Frameworks */,
 				DABB153B378A68315330725B /* [CP] Copy Pods Resources */,
 			);
@@ -215,6 +218,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+		};
+		7F4E79C12D2A4BC0801F2D44 /* Sign Native Asset Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Sign Native Asset Frameworks";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nif [ \"${PLATFORM_NAME:-}\" != \"iphoneos\" ]; then\n  exit 0\nfi\n\nif [ -z \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  exit 0\nfi\n\nFRAMEWORKS_DIR=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\n\nsign_if_needed() {\n  local framework=\"$1\"\n  local info_plist=\"$framework/Info.plist\"\n  if [ ! -f \"$info_plist\" ]; then\n    return\n  fi\n\n  local executable_name\n  executable_name=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' \"$info_plist\" 2>/dev/null || basename \"$framework\" .framework)\n  local executable=\"$framework/$executable_name\"\n  if [ ! -f \"$executable\" ]; then\n    return\n  fi\n\n  local signature team\n  signature=$(/usr/bin/codesign -dv --verbose=4 \"$executable\" 2>&1 | sed -n 's/^Signature=//p' || true)\n  team=$(/usr/bin/codesign -dv --verbose=4 \"$executable\" 2>&1 | sed -n 's/^TeamIdentifier=//p' || true)\n  if [ \"$signature\" != \"adhoc\" ] && [ \"$team\" != \"not set\" ] && [ -n \"$team\" ]; then\n    return\n  fi\n\n  if /usr/bin/lipo -info \"$executable\" >/dev/null 2>&1; then\n    for arch in $(/usr/bin/lipo -archs \"$executable\"); do\n      case \" ${ARCHS:-arm64} \" in\n        *\" $arch \"*) ;;\n        *)\n          /usr/bin/lipo -remove \"$arch\" \"$executable\" -output \"$executable\"\n          ;;\n      esac\n    done\n  fi\n\n  /usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp=none \"$framework\"\n}\n\nfind \"$FRAMEWORKS_DIR\" -maxdepth 1 -type d -name '*.framework' -print0 | while IFS= read -r -d '' framework; do\n  sign_if_needed \"$framework\"\ndone\n";
 		};
 		9740EEB61CF901F6004384FC /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -379,7 +397,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = CT8SVPPTV4;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -395,7 +413,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.RefApp;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.self.ocm-live-tracker";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -519,7 +537,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = CT8SVPPTV4;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -535,7 +553,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.RefApp;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.self.ocm-live-tracker";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -551,7 +569,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = CT8SVPPTV4;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -567,7 +585,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.RefApp;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.self.ocm-live-tracker";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

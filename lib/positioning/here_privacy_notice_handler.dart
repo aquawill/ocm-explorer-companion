@@ -21,7 +21,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:here_sdk_reference_application_flutter/common/hds_icons/hds_assets_paths.dart';
 import 'package:here_sdk_reference_application_flutter/common/hds_icons/hds_icon_widget.dart';
-import 'package:here_sdk_reference_application_flutter/l10n/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -29,8 +28,33 @@ import '../common/application_preferences.dart';
 import '../common/gradient_elevated_button.dart';
 import '../common/ui_style.dart';
 
-// HERE Privacy Notice Url
-const String _herePrivacyNoticeUrl = 'https://legal.here.com/here-network-positioning-via-sdk';
+// Third-party privacy notice URLs.
+const String _herePrivacyNoticeUrl =
+    'https://legal.here.com/en-gb/here-network-positioning-via-sdk';
+const String _firebasePrivacyUrl =
+    'https://firebase.google.com/support/privacy';
+
+const String _privacyNoticeText = '''
+Last updated: May 8, 2026
+
+OCM Explorer Companion is a companion app for OCM Explorer. Its remote tracking feature sends your device's current location to the remote endpoint that you configure, so another OCM Explorer client can view the latest position.
+
+Data handled by this app may include latitude, longitude, timestamp, speed, heading, altitude, positioning accuracy, the Device ID you enter, remote tracking settings, and GPX track files.
+
+When OCM Live Tracking is active, the app writes the current location to the configured Firebase Realtime Database path. Firebase is used only as a current-location relay for this feature. Full track history is stored on this device as GPX files, one file per tracking session, unless you choose to share or export those files through the system share sheet.
+
+The app does not send location updates after tracking is stopped. You can change the Device ID and remote endpoint settings at any time. Removing the app normally removes its local settings and locally stored GPX files.
+
+If you export a GPX file, the selected receiving app or service controls how that exported copy is handled.
+''';
+
+const String _herePrivacyNoticeText =
+    'This app uses HERE SDK for map display and location-related functionality. '
+    'When HERE network positioning is used, HERE may process location data and nearby Wi-Fi or mobile network signal characteristics as described in the HERE privacy notice: ';
+
+const String _firebasePrivacyNoticeText =
+    'If you configure Firebase Realtime Database as the remote tracking endpoint, that service is provided by Google Firebase. '
+    'Firebase privacy and security information is available here: ';
 
 const EdgeInsets _commonPadding = const EdgeInsets.symmetric(
   vertical: UIStyle.contentMarginLarge,
@@ -45,10 +69,9 @@ class HerePrivacyNoticeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppLocalizations localized = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(localized.privacyNotice),
+        title: const Text('Privacy Notice'),
         leading: IconButton(
           highlightColor: UIStyle.foregroundInactive,
           onPressed: () => Navigator.maybePop(context),
@@ -58,10 +81,14 @@ class HerePrivacyNoticeScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: _commonPadding,
-        child: Column(
+        child: ListView(
           children: <Widget>[
-            Text(localized.privacyNoticePlaceholder, style: TextStyle(fontSize: UIStyle.bigFontSize)),
-            HerePrivacyNoticeWidget(),
+            Text(
+              _privacyNoticeText,
+              style: TextStyle(fontSize: UIStyle.bigFontSize),
+            ),
+            const SizedBox(height: UIStyle.contentMarginLarge),
+            const HerePrivacyNoticeWidget(),
           ],
         ),
       ),
@@ -73,7 +100,7 @@ class HerePrivacyNoticeScreen extends StatelessWidget {
 class HerePrivacyNoticeWidget extends StatelessWidget {
   const HerePrivacyNoticeWidget({super.key});
 
-  void _launchURL(String url) async {
+  Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -84,19 +111,32 @@ class HerePrivacyNoticeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppLocalizations localized = AppLocalizations.of(context)!;
     return RichText(
       text: TextSpan(
-        style: DefaultTextStyle.of(context).style.copyWith(fontSize: UIStyle.bigFontSize),
+        style: DefaultTextStyle.of(
+          context,
+        ).style.copyWith(fontSize: UIStyle.bigFontSize),
         children: [
-          TextSpan(text: localized.herePrivacyNotice),
+          const TextSpan(text: _herePrivacyNoticeText),
           TextSpan(
             text: _herePrivacyNoticeUrl,
             style: TextStyle(
               color: Colors.blue,
               decoration: TextDecoration.underline,
             ),
-            recognizer: TapGestureRecognizer()..onTap = () => _launchURL(_herePrivacyNoticeUrl),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => _launchURL(_herePrivacyNoticeUrl),
+          ),
+          const TextSpan(text: '\n\n'),
+          const TextSpan(text: _firebasePrivacyNoticeText),
+          TextSpan(
+            text: _firebasePrivacyUrl,
+            style: TextStyle(
+              color: Colors.blue,
+              decoration: TextDecoration.underline,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => _launchURL(_firebasePrivacyUrl),
           ),
         ],
       ),
@@ -110,18 +150,26 @@ class HerePrivacyDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppLocalizations localized = AppLocalizations.of(context)!;
     return PopScope(
       canPop: false,
       child: AlertDialog(
         scrollable: true,
-        title: Text(localized.welcome, textAlign: TextAlign.center),
-        content: Column(children: <Widget>[Text(localized.welcomeMessage), HerePrivacyNoticeWidget()]),
+        title: const Text('Welcome', textAlign: TextAlign.center),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'Thanks for using OCM Explorer Companion.\n\n'
+              'Please review the following privacy notice before continuing.\n\n',
+            ),
+            const HerePrivacyNoticeWidget(),
+          ],
+        ),
         actions: [
           GradientElevatedButton(
-            title: Text(localized.continueTitle),
+            title: const Text('Continue'),
             onPressed: () => Navigator.of(context).pop(true),
-          )
+          ),
         ],
         contentPadding: _commonPadding,
         actionsPadding: _commonPadding,
@@ -141,6 +189,9 @@ Future<void> showHerePrivacyDialog(BuildContext context) async {
     },
   );
   if (accepted == true) {
-    Provider.of<AppPreferences>(context, listen: false).isHerePrivacyDialogShown = true;
+    Provider.of<AppPreferences>(
+      context,
+      listen: false,
+    ).isHerePrivacyDialogShown = true;
   }
 }

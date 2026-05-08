@@ -19,11 +19,11 @@
   "@allowHighwayTitle": {
     "description": "路線偏好設定切換器標題"
   },
-  "appTitle": "HERE SDK for Flutter - 參考應用程式",
+  "appTitle": "OCM Explorer Companion",
   "@appTitle": {
     "description": "應用程式標題"
   },
-  "appTitleHeader": "HERE SDK for Flutter '{{0}}' 參考應用程式\n基於 HERE SDK '{{1}}'.'{{2}}'.'{{3}}'",
+  "appTitleHeader": "OCM Explorer Companion\n'{{0}}' · HERE SDK '{{1}}'.'{{2}}'.'{{3}}'",
   "@appTitleHeader": {
     "description": "抽屜標頭中的應用程式標題"
   },
@@ -2062,7 +2062,7 @@
   "@Welcome": {
     "description": "首次使用歡迎對話方塊的標題"
   },
-  "welcomeMessage": "並感謝您使用 HERE SDK for Flutter 參考應用程式。在此放置您的首次使用資訊。\n如需隱私聲明，請包含以下文字：\n",
+  "welcomeMessage": "感謝您使用 OCM Explorer Companion。\n如需隱私聲明，請包含以下文字：\n",
   "@welcomeMessage": {
     "description": "首次使用歡迎對話方塊訊息"
   },

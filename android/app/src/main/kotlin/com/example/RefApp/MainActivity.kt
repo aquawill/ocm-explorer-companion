@@ -24,9 +24,11 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import androidx.core.content.FileProvider
 import com.example.RefApp.FlutterForegroundService
 import com.example.RefApp.FlutterForegroundService.Companion.START_FOREGROUND_ACTION
 import com.example.RefApp.FlutterForegroundService.Companion.STOP_FOREGROUND_ACTION
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
@@ -37,12 +39,14 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val FLUTTER_ENGINE_ID = "refAppFlutterEngine"
         private const val CHANNEL = "com.example.RefApp/foreground_service_channel"
+        private const val SHARE_CHANNEL = "com.example.RefApp/share_channel"
         private const val BATTERY_SAVER_INTENT_ACTION = "android.settings.BATTERY_SAVER_SETTINGS"
         private const val START_SERVICE = "startService"
         private const val STOP_SERVICE = "stopService"
         private const val UPDATE_SERVICE = "updateService"
         private const val OPEN_BATTERY_SAVER_SETTINGS = "openBatterySaverSettings"
         private const val BATTERY_SAVER_ARGUMENTS = "battery_saver"
+        private const val SHARE_FILE = "shareFile"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,12 +65,30 @@ class MainActivity : FlutterActivity() {
             CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
-                START_SERVICE -> launchForegroundService(createIntent(call))
+                START_SERVICE -> {
+                    launchForegroundService(createIntent(call))
+                    result.success(null)
+                }
 
-                STOP_SERVICE -> stopForegroundService(createIntent(call))
+                STOP_SERVICE -> {
+                    stopForegroundService(createIntent(call))
+                    result.success(null)
+                }
 
-                OPEN_BATTERY_SAVER_SETTINGS -> openBatterySaverSettings(call)
+                OPEN_BATTERY_SAVER_SETTINGS -> {
+                    openBatterySaverSettings(call)
+                    result.success(null)
+                }
 
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            SHARE_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                SHARE_FILE -> shareFile(call, result)
                 else -> result.notImplemented()
             }
         }
@@ -119,6 +141,40 @@ class MainActivity : FlutterActivity() {
     private fun stopForegroundService(intent: Intent) {
         intent.action = STOP_FOREGROUND_ACTION
         context.startService(intent)
+    }
+
+    private fun shareFile(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        if (path.isNullOrBlank()) {
+            result.error("missing_path", "Missing file path.", null)
+            return
+        }
+
+        val file = File(path)
+        if (!file.exists()) {
+            result.error("missing_file", "File does not exist: $path", null)
+            return
+        }
+
+        val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${applicationContext.packageName}.fileprovider",
+            file
+        )
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, uri)
+            call.argument<String>("subject")?.let {
+                putExtra(Intent.EXTRA_SUBJECT, it)
+            }
+            call.argument<String>("text")?.let {
+                putExtra(Intent.EXTRA_TEXT, it)
+            }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(sendIntent, null))
+        result.success(null)
     }
 
     override fun provideFlutterEngine(context: Context): FlutterEngine? {

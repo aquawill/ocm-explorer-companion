@@ -33,12 +33,14 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'common/application_preferences.dart';
+import 'common/app_identity.dart';
 import 'common/custom_map_style_settings.dart';
 import 'common/ui_style.dart';
 import 'download_maps/download_maps_screen.dart';
 import 'download_maps/map_loader_controller.dart';
 import 'download_maps/map_regions_list_screen.dart';
 import 'landing_screen.dart';
+import 'live_tracker/live_tracker_service.dart';
 import 'navigation/navigation_screen.dart';
 import 'positioning/here_privacy_notice_handler.dart';
 import 'positioning/positioning_engine.dart';
@@ -50,21 +52,34 @@ import 'routing/waypoints_controller.dart';
 import 'search/recent_search_data_model.dart';
 import 'search/search_results_screen.dart';
 
+LogAppender? _hereSdkLogAppender;
+
 /// The entry point of the application.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SdkContext.init();
+  _configureHereSdkLogging();
 
   // Obtain an instance of SharedPreferences for persistent storage.
-  final SharedPreferences _sharedPreferences = await SharedPreferences.getInstance();
+  final SharedPreferences _sharedPreferences =
+      await SharedPreferences.getInstance();
 
   // Load catalog configurations data from preferences and convert to CatalogConfiguration format.
+  final List<CatalogConfigurationData>? catalogConfigurationData =
+      AppPreferences.loadSdkOptionsCatalogConfigurationFromPrefs(
+        _sharedPreferences,
+      );
+  _logCatalogConfigurations(catalogConfigurationData);
   final List<CatalogConfiguration>? catalogConfigurations =
-      AppPreferences.loadSdkOptionsCatalogConfigurationFromPrefs(_sharedPreferences)?.toSdkCatalogConfigurations();
+      catalogConfigurationData?.toSdkCatalogConfigurations();
+  _logCredentialPresence();
 
   // Create SDKOptions with authentication using access key and secret.
   final SDKOptions sdkOptions = SDKOptions.withAuthenticationMode(
-    AuthenticationMode.withKeySecret(Environment.accessKeyId, Environment.accessKeySecret),
+    AuthenticationMode.withKeySecret(
+      Environment.accessKeyId,
+      Environment.accessKeySecret,
+    ),
   );
 
   // If catalog configurations are available, assign them to sdkOptions.
@@ -77,6 +92,62 @@ Future<void> main() async {
     onSuccess: () => runApp(MyApp()),
     onFailure: (_) => runApp(const InitErrorScreen()),
   );
+}
+
+void _logCredentialPresence() {
+  final bool hasAccessKeyId = Environment.accessKeyId.trim().isNotEmpty;
+  final bool hasAccessKeySecret = Environment.accessKeySecret.trim().isNotEmpty;
+  debugPrint(
+    '[$companionAppName] HERE credentials '
+    'accessKeyId=${hasAccessKeyId ? 'set' : 'missing'}, '
+    'accessKeySecret=${hasAccessKeySecret ? 'set' : 'missing'}',
+  );
+}
+
+void _configureHereSdkLogging() {
+  LogControl.enableLoggingToConsole(LogLevel.logLevelInfo);
+  _hereSdkLogAppender = LogAppender((LogLevel level, String message) {
+    debugPrint('[HERE SDK ${_logLevelLabel(level)}] $message');
+  });
+  LogControl.setCustomAppender(LogLevel.logLevelInfo, _hereSdkLogAppender!);
+  debugPrint('[$companionAppName] HERE SDK logging enabled.');
+}
+
+String _logLevelLabel(LogLevel level) {
+  switch (level) {
+    case LogLevel.logLevelInfo:
+      return 'INFO';
+    case LogLevel.logLevelWarning:
+      return 'WARN';
+    case LogLevel.logLevelError:
+      return 'ERROR';
+    case LogLevel.logLevelFatal:
+      return 'FATAL';
+    case LogLevel.logLevelOff:
+      return 'OFF';
+  }
+}
+
+void _logCatalogConfigurations(List<CatalogConfigurationData>? configs) {
+  if (configs == null || configs.isEmpty) {
+    debugPrint('[$companionAppName] No custom catalog configurations.');
+    return;
+  }
+
+  debugPrint(
+    '[$companionAppName] Applying ${configs.length} custom catalog configuration(s).',
+  );
+  for (final CatalogConfigurationData config in configs) {
+    debugPrint(
+      '[$companionAppName] CatalogConfiguration '
+      'hrn=${config.hrn}, '
+      'version=${config.version ?? 'latest'}, '
+      'allowDownload=${config.allowDownload}, '
+      'ignoreCachedData=${config.ignoreCachedData}, '
+      'cacheExpirationInSec=${config.cacheExpirationInSec ?? 'none'}, '
+      'patchHrn=${config.patchHrn ?? 'none'}',
+    );
+  }
 }
 
 /// Application root widget.
@@ -97,10 +168,13 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => RecentSearchDataModel()),
-        ChangeNotifierProvider(create: (context) => RoutePreferencesModel.withDefaults()),
+        ChangeNotifierProvider(
+          create: (context) => RoutePreferencesModel.withDefaults(),
+        ),
         ChangeNotifierProvider(create: (context) => MapLoaderController()),
         ChangeNotifierProvider(create: (context) => AppPreferences()),
         Provider(create: (context) => PositioningEngine()),
+        ChangeNotifierProvider(create: (context) => LiveTrackerService()),
         ChangeNotifierProvider(create: (context) => CustomMapStyleSettings()),
       ],
       child: MaterialApp(
@@ -110,15 +184,14 @@ class _MyAppState extends State<MyApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: [
-          const Locale('en', ''),
-          const Locale('zh', 'TW'),
-        ],
+        supportedLocales: [const Locale('en', ''), const Locale('zh', 'TW')],
         theme: UIStyle.lightTheme,
-        onGenerateTitle: (BuildContext context) => AppLocalizations.of(context)!.appTitle,
+        onGenerateTitle: (BuildContext context) =>
+            AppLocalizations.of(context)!.appTitle,
         onGenerateRoute: (RouteSettings settings) {
           Map<String, WidgetBuilder> routes = {
-            LandingScreen.navRoute: (BuildContext context) => LandingScreen(key: LandingScreen.landingScreenKey),
+            LandingScreen.navRoute: (BuildContext context) =>
+                LandingScreen(key: LandingScreen.landingScreenKey),
             SearchResultsScreen.navRoute: (BuildContext context) {
               List<dynamic> arguments = settings.arguments as List<dynamic>;
               assert(arguments.length == 4);
@@ -157,7 +230,8 @@ class _MyAppState extends State<MyApp> {
             DownloadMapsScreen.navRoute: (BuildContext context) {
               return DownloadMapsScreen();
             },
-            HerePrivacyNoticeScreen.navRoute: (BuildContext context) => HerePrivacyNoticeScreen(),
+            HerePrivacyNoticeScreen.navRoute: (BuildContext context) =>
+                HerePrivacyNoticeScreen(),
             MapRegionsListScreen.navRoute: (BuildContext context) {
               List<dynamic> arguments = settings.arguments as List<dynamic>;
               assert(arguments.length == 1);
@@ -165,7 +239,8 @@ class _MyAppState extends State<MyApp> {
                 regions: arguments[0] as List<Region>,
               );
             },
-            CustomCatalogConfigurationScreen.navRoute: (BuildContext context) => CustomCatalogConfigurationScreen(),
+            CustomCatalogConfigurationScreen.navRoute: (BuildContext context) =>
+                CustomCatalogConfigurationScreen(),
           };
 
           WidgetBuilder builder = routes[settings.name]!;
@@ -203,9 +278,7 @@ class InitErrorScreen extends StatelessWidget {
         },
       ),
       theme: UIStyle.lightTheme,
-      localizationsDelegates: [
-        AppLocalizations.delegate,
-      ],
+      localizationsDelegates: [AppLocalizations.delegate],
     );
   }
 }

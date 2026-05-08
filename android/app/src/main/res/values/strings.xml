@@ -1,3 +1,4 @@
 <resources>
-    <string name="service_description">Service to keep HERE navigation running in the background</string>
+    <string name="app_name">OCM Explorer Companion</string>
+    <string name="service_description">Service to keep OCM Live Tracking running in the background</string>
 </resources>
