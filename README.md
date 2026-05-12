@@ -9,7 +9,7 @@ This README is intended to:
 
 ## Feature Overview
 
-This app is the mobile companion tool for OCM Explorer. Its main purpose is to collect the current phone location, run HERE SDK map matching, query the corresponding OCM segment attributes, and optionally send the current location to another OCM Explorer client.
+This app is the mobile companion tool for OCM Explorer (https://aquawill.github.io/ocm-explorer-releases/). Its main purpose is to collect the current phone location, run HERE SDK map matching, query the corresponding OCM segment attributes, and optionally send the current location to another OCM Explorer client.
 
 Current features:
 
