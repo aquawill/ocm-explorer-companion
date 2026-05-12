@@ -61,13 +61,13 @@ Future<void> main() async {
   _configureHereSdkLogging();
 
   // Obtain an instance of SharedPreferences for persistent storage.
-  final SharedPreferences _sharedPreferences =
+  final SharedPreferences sharedPreferences =
       await SharedPreferences.getInstance();
 
   // Load catalog configurations data from preferences and convert to CatalogConfiguration format.
   final List<CatalogConfigurationData>? catalogConfigurationData =
       AppPreferences.loadSdkOptionsCatalogConfigurationFromPrefs(
-        _sharedPreferences,
+        sharedPreferences,
       );
   _logCatalogConfigurations(catalogConfigurationData);
   final List<CatalogConfiguration>? catalogConfigurations =
@@ -89,7 +89,7 @@ Future<void> main() async {
 
   createSDKNativeEngine(
     sdkOptions: sdkOptions,
-    onSuccess: () => runApp(MyApp()),
+    onSuccess: () => runApp(MyApp(sharedPreferences: sharedPreferences)),
     onFailure: (_) => runApp(const InitErrorScreen()),
   );
 }
@@ -152,6 +152,10 @@ void _logCatalogConfigurations(List<CatalogConfigurationData>? configs) {
 
 /// Application root widget.
 class MyApp extends StatefulWidget {
+  const MyApp({super.key, required this.sharedPreferences});
+
+  final SharedPreferences sharedPreferences;
+
   @override
   _MyAppState createState() => _MyAppState();
 }
@@ -172,7 +176,10 @@ class _MyAppState extends State<MyApp> {
           create: (context) => RoutePreferencesModel.withDefaults(),
         ),
         ChangeNotifierProvider(create: (context) => MapLoaderController()),
-        ChangeNotifierProvider(create: (context) => AppPreferences()),
+        ChangeNotifierProvider(
+          create: (context) =>
+              AppPreferences.withSharedPreferences(widget.sharedPreferences),
+        ),
         Provider(create: (context) => PositioningEngine()),
         ChangeNotifierProvider(create: (context) => LiveTrackerService()),
         ChangeNotifierProvider(create: (context) => CustomMapStyleSettings()),
@@ -184,7 +191,8 @@ class _MyAppState extends State<MyApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: [const Locale('en', ''), const Locale('zh', 'TW')],
+        locale: const Locale('en', ''),
+        supportedLocales: const [Locale('en', '')],
         theme: UIStyle.lightTheme,
         onGenerateTitle: (BuildContext context) =>
             AppLocalizations.of(context)!.appTitle,
@@ -261,6 +269,8 @@ class InitErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      locale: const Locale('en', ''),
+      supportedLocales: const [Locale('en', '')],
       home: Builder(
         builder: (context) {
           return Container(

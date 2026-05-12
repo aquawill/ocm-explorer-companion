@@ -18,13 +18,18 @@
  */
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:here_sdk/core.dart';
+import 'package:here_sdk/core.engine.dart';
 import 'package:here_sdk/location.dart';
+import 'package:here_sdk/mapmatcher.dart' as MapMatcher;
 import 'package:here_sdk/navigation.dart' as Navigation;
 import 'package:here_sdk_reference_application_flutter/common/device_info.dart';
+import 'package:here_sdk_reference_application_flutter/live_tracker/live_tracker_location_update.dart';
+import 'package:here_sdk/routing.dart' as Routing;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -38,12 +43,18 @@ class PositioningEngine {
   static const int _locationServicePeriodicDurationInSeconds = 3;
   static const int _androidApiLevel30 = 30;
   LocationEngine? _locationEngine;
-  Navigation.VisualNavigator? _liveTrackerVisualNavigator;
-  bool _liveTrackerVisualNavigatorAttached = false;
+  MapMatcher.MapMatcher? _liveTrackerMapMatcher;
   bool _liveTrackerBackgroundNavigationEnabled = false;
+  int _liveTrackerMapMatchingSampleCount = 0;
+  int _liveTrackerConsecutiveUnmatchedCount = 0;
+  DateTime? _liveTrackerLastMatchedAt;
+  DateTime? _liveTrackerLastMapMatchingDiagnosticLogAt;
+  bool? _liveTrackerLastMapMatchingDiagnosticLogMatched;
 
   StreamController<Location> _locationUpdatesController =
       StreamController.broadcast();
+  final _liveTrackerLocationUpdatesController =
+      StreamController<LiveTrackerLocationUpdate>.broadcast();
   StreamController<LocationEngineStatus> _locationEngineStatusController =
       StreamController.broadcast();
 
@@ -61,6 +72,10 @@ class PositioningEngine {
 
   /// Gets stream with location updates.
   Stream<Location> get getLocationUpdates => _locationUpdatesController.stream;
+
+  /// Gets raw and map-matched location updates for live tracking.
+  Stream<LiveTrackerLocationUpdate> get getLiveTrackerLocationUpdates =>
+      _liveTrackerLocationUpdatesController.stream;
 
   /// Gets stream with location engine status updates.
   Stream<LocationEngineStatus> get getLocationEngineStatusUpdates =>
@@ -193,7 +208,10 @@ class PositioningEngine {
       !_liveTrackerBackgroundNavigationEnabled,
     );
     _locationEngine!.addLocationListener(
-      LocationListener((location) => _locationUpdatesController.add(location)),
+      LocationListener((location) {
+        _locationUpdatesController.add(location);
+        _publishLiveTrackerLocation(location);
+      }),
     );
     _locationEngine!.addLocationStatusListener(
       LocationStatusListener(
@@ -228,12 +246,6 @@ class PositioningEngine {
     }
 
     if (_liveTrackerBackgroundNavigationEnabled) {
-      final Navigation.VisualNavigator visualNavigator =
-          _liveTrackerVisualNavigator ??= Navigation.VisualNavigator();
-      if (!_liveTrackerVisualNavigatorAttached) {
-        locationEngine.addLocationListener(visualNavigator);
-        _liveTrackerVisualNavigatorAttached = true;
-      }
       locationEngine
         ..setBackgroundLocationAllowed(true)
         ..setBackgroundLocationIndicatorVisible(true)
@@ -247,16 +259,209 @@ class PositioningEngine {
       return;
     }
 
-    final Navigation.VisualNavigator? visualNavigator =
-        _liveTrackerVisualNavigator;
-    if (_liveTrackerVisualNavigatorAttached && visualNavigator != null) {
-      locationEngine.removeLocationListener(visualNavigator);
-      _liveTrackerVisualNavigatorAttached = false;
-    }
     locationEngine
       ..setBackgroundLocationAllowed(false)
       ..setBackgroundLocationIndicatorVisible(false)
       ..setPauseLocationUpdatesAutomatically(true);
+  }
+
+  void _publishLiveTrackerLocation(Location location) {
+    if (_liveTrackerLocationUpdatesController.isClosed) {
+      return;
+    }
+
+    final DateTime observedAt = DateTime.now().toUtc();
+    Object? matchError;
+    StackTrace? matchStackTrace;
+    Navigation.MapMatchedLocation? matchedLocation;
+    try {
+      matchedLocation = _liveTrackerMapMatcherForDiagnostics()?.match(location);
+    } catch (error, stackTrace) {
+      matchError = error;
+      matchStackTrace = stackTrace;
+    }
+
+    final bool hasMatchedLocation = matchedLocation != null;
+    _liveTrackerMapMatchingSampleCount++;
+    if (hasMatchedLocation) {
+      _liveTrackerConsecutiveUnmatchedCount = 0;
+      _liveTrackerLastMatchedAt = observedAt;
+    } else {
+      _liveTrackerConsecutiveUnmatchedCount++;
+    }
+
+    final Map<String, dynamic> diagnostics = _mapMatchingDiagnosticsFor(
+      rawLocation: location,
+      matchedLocation: matchedLocation,
+      observedAt: observedAt,
+      matchError: matchError,
+      matchStackTrace: matchStackTrace,
+    );
+    _logMapMatchingDiagnostics(diagnostics, hasMatchedLocation, observedAt);
+    _liveTrackerLocationUpdatesController.add(
+      LiveTrackerLocationUpdate(
+        rawLocation: location,
+        matchedLocation: matchedLocation,
+        mapMatchingDiagnostics: diagnostics,
+      ),
+    );
+  }
+
+  MapMatcher.MapMatcher? _liveTrackerMapMatcherForDiagnostics() {
+    final MapMatcher.MapMatcher? existing = _liveTrackerMapMatcher;
+    if (existing != null) {
+      return existing;
+    }
+
+    final SDKNativeEngine? sdkNativeEngine = SDKNativeEngine.sharedInstance;
+    if (sdkNativeEngine == null) {
+      return null;
+    }
+
+    return _liveTrackerMapMatcher = MapMatcher.MapMatcher.withLayers(
+      sdkNativeEngine,
+      true,
+    );
+  }
+
+  Map<String, dynamic> _mapMatchingDiagnosticsFor({
+    required Location rawLocation,
+    required Navigation.MapMatchedLocation? matchedLocation,
+    required DateTime observedAt,
+    Object? matchError,
+    StackTrace? matchStackTrace,
+  }) {
+    final DateTime? lastMatchedAt = _liveTrackerLastMatchedAt;
+    return <String, dynamic>{
+      'type': 'mapMatching',
+      'source': 'MapMatcher.match',
+      'observedAt': observedAt.toIso8601String(),
+      'sampleCount': _liveTrackerMapMatchingSampleCount,
+      'hasMatchedLocation': matchedLocation != null,
+      'consecutiveUnmatchedCount': _liveTrackerConsecutiveUnmatchedCount,
+      if (lastMatchedAt != null)
+        'lastMatchedAt': lastMatchedAt.toIso8601String(),
+      if (lastMatchedAt != null && matchedLocation == null)
+        'timeSinceLastMatchedMs': observedAt
+            .difference(lastMatchedAt)
+            .inMilliseconds,
+      'locationEngineStarted': _locationEngine?.isStarted,
+      'mapMatcherReady': _liveTrackerMapMatcher != null,
+      'backgroundNavigationEnabled': _liveTrackerBackgroundNavigationEnabled,
+      'raw': _locationDiagnostics(rawLocation),
+      if (matchedLocation != null)
+        'matched': _mapMatchedLocationDiagnostics(matchedLocation),
+      if (matchError != null)
+        'error': <String, dynamic>{
+          'type': matchError.runtimeType.toString(),
+          'message': matchError.toString(),
+          if (matchStackTrace != null) 'stackTrace': matchStackTrace.toString(),
+        },
+      if (matchedLocation == null)
+        'message':
+            'HERE SDK MapMatcher returned null mapMatchedLocation; segment evidence lookup skipped.',
+    }..removeWhere((_, Object? value) => value == null);
+  }
+
+  void _logMapMatchingDiagnostics(
+    Map<String, dynamic> diagnostics,
+    bool hasMatchedLocation,
+    DateTime observedAt,
+  ) {
+    final DateTime? lastLogAt = _liveTrackerLastMapMatchingDiagnosticLogAt;
+    final bool stateChanged =
+        _liveTrackerLastMapMatchingDiagnosticLogMatched != hasMatchedLocation;
+    final int? elapsedSinceLogSeconds = lastLogAt == null
+        ? null
+        : observedAt.difference(lastLogAt).inSeconds;
+    final bool shouldLog =
+        stateChanged ||
+        elapsedSinceLogSeconds == null ||
+        (!hasMatchedLocation && elapsedSinceLogSeconds >= 3) ||
+        elapsedSinceLogSeconds >= 15;
+
+    if (!shouldLog) {
+      return;
+    }
+
+    _liveTrackerLastMapMatchingDiagnosticLogAt = observedAt;
+    _liveTrackerLastMapMatchingDiagnosticLogMatched = hasMatchedLocation;
+    debugPrint(
+      '[OCM MapMatching]\n'
+      '${const JsonEncoder.withIndent('  ').convert(diagnostics)}',
+    );
+  }
+
+  Map<String, dynamic> _locationDiagnostics(Location location) {
+    return <String, dynamic>{
+      'coordinates': _geoCoordinatesDiagnostics(location.coordinates),
+      'horizontalAccuracyM': _finiteDouble(location.horizontalAccuracyInMeters),
+      'verticalAccuracyM': _finiteDouble(location.verticalAccuracyInMeters),
+      'speedMps': _finiteDouble(location.speedInMetersPerSecond),
+      'speedAccuracyMps': _finiteDouble(
+        location.speedAccuracyInMetersPerSecond,
+      ),
+      'bearingDeg': _finiteDouble(location.bearingInDegrees),
+      'bearingAccuracyDeg': _finiteDouble(location.bearingAccuracyInDegrees),
+      'time': location.time?.toUtc().toIso8601String(),
+      'timestampSinceBootMs': location.timestampSinceBoot?.inMilliseconds,
+      'gnssTimeMs': location.gnssTime?.inMilliseconds,
+      'locationTechnology': _enumName(location.locationTechnology),
+      'pitchDeg': _finiteDouble(location.pitchInDegrees),
+      'laneIndex': location.laneIndex,
+    }..removeWhere((_, Object? value) => value == null);
+  }
+
+  Map<String, dynamic> _mapMatchedLocationDiagnostics(
+    Navigation.MapMatchedLocation location,
+  ) {
+    return <String, dynamic>{
+      'coordinates': _geoCoordinatesDiagnostics(location.coordinates),
+      'confidence': _finiteDouble(location.confidence),
+      'segmentReference': _segmentReferenceDiagnostics(
+        location.segmentReference,
+      ),
+      'segmentOffsetCm': location.segmentOffsetInCentimeters,
+      'isDrivingInTheWrongWay': location.isDrivingInTheWrongWay,
+      'horizontalAccuracyM': _finiteDouble(location.horizontalAccuracyInMeters),
+      'speedMps': _finiteDouble(location.speedInMetersPerSecond),
+      'bearingDeg': _finiteDouble(location.bearingInDegrees),
+      'timestamp': location.timestamp?.toUtc().toIso8601String(),
+    }..removeWhere((_, Object? value) => value == null);
+  }
+
+  Map<String, dynamic> _geoCoordinatesDiagnostics(GeoCoordinates coordinates) {
+    return <String, dynamic>{
+      'lat': _finiteDouble(coordinates.latitude),
+      'lon': _finiteDouble(coordinates.longitude),
+      'altitudeM': _finiteDouble(coordinates.altitude),
+    }..removeWhere((_, Object? value) => value == null);
+  }
+
+  Map<String, dynamic> _segmentReferenceDiagnostics(
+    Routing.SegmentReference segmentReference,
+  ) {
+    return <String, dynamic>{
+      'segmentId': segmentReference.segmentId,
+      'travelDirection': _enumName(segmentReference.travelDirection),
+      'offsetStart': _finiteDouble(segmentReference.offsetStart),
+      'offsetEnd': _finiteDouble(segmentReference.offsetEnd),
+      'tilePartitionId': segmentReference.tilePartitionId,
+      'localId': segmentReference.localId,
+    }..removeWhere((_, Object? value) => value == null);
+  }
+
+  double? _finiteDouble(double? value) {
+    return value == null || !value.isFinite ? null : value;
+  }
+
+  String? _enumName(Object? value) {
+    if (value == null) {
+      return null;
+    }
+    final String text = value.toString();
+    final int dot = text.lastIndexOf('.');
+    return dot >= 0 ? text.substring(dot + 1) : text;
   }
 
   /// Creates and initialises the location engine if all required permissions

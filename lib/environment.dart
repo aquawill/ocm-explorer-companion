@@ -17,7 +17,17 @@
  * License-Filename: LICENSE
  */
 
- class Environment {
-  static const String accessKeyId = String.fromEnvironment('HERESDK_ACCESS_KEY_ID');
-  static const String accessKeySecret = String.fromEnvironment('HERESDK_ACCESS_KEY_SECRET');
+class Environment {
+  static const String accessKeyId = String.fromEnvironment(
+    'HERESDK_ACCESS_KEY_ID',
+  );
+  static const String accessKeySecret = String.fromEnvironment(
+    'HERESDK_ACCESS_KEY_SECRET',
+  );
+  static const String firebaseDatabaseUrl = String.fromEnvironment(
+    'FIREBASE_DATABASE_URL',
+  );
+  static const String firebasePathPrefix = String.fromEnvironment(
+    'FIREBASE_PATH_PREFIX',
+  );
 }
