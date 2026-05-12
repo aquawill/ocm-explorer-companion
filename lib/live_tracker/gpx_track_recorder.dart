@@ -171,8 +171,8 @@ class GpxTrackRecorder {
     required String deviceId,
     required DateTime startedAt,
   }) {
-    final String escapedSessionId = _xml(sessionId);
-    final String escapedDeviceId = _xml(deviceId);
+    final String escapedSessionId = _xmlText(sessionId);
+    final String escapedDeviceId = _xmlText(deviceId);
     final String startedAtText = startedAt.toIso8601String();
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="$_creator" xmlns="http://www.topografix.com/GPX/1/1" xmlns:ocm="https://self.local/ocm-live-tracker">
@@ -278,7 +278,7 @@ $_footer''';
     if (value == null || value.isEmpty) {
       return;
     }
-    buffer.writeln('          <ocm:$name>${_xml(value)}</ocm:$name>');
+    buffer.writeln('          <ocm:$name>${_xmlText(value)}</ocm:$name>');
   }
 
   void _jsonExtensionElement(
@@ -290,7 +290,7 @@ $_footer''';
       return;
     }
     buffer.writeln(
-      '          <ocm:$name>${_xml(jsonEncode(value))}</ocm:$name>',
+      '          <ocm:$name>${_xmlText(jsonEncode(value))}</ocm:$name>',
     );
   }
 
@@ -325,12 +325,10 @@ $_footer''';
     return safe.isEmpty ? 'track' : safe;
   }
 
-  String _xml(String value) {
+  String _xmlText(String value) {
     return value
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&apos;');
+        .replaceAll('>', '&gt;');
   }
 }

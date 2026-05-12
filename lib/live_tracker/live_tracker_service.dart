@@ -459,13 +459,14 @@ class LiveTrackerService extends ChangeNotifier {
         _firebaseSession!,
       );
       _firebaseSequence++;
-      final Map<String, dynamic> point = _payloadFor(
+      final Map<String, dynamic> firebasePoint = _payloadFor(
         update,
         sentAt,
         session: _firebaseSession,
         sequence: _firebaseSequence,
-        segmentEvidence: segmentEvidence,
       );
+      final Map<String, dynamic>? matchedLocation =
+          firebasePoint['matched'] as Map<String, dynamic>?;
       final String? gpxTrackFilePath = _gpxTrackFilePath;
       if (gpxTrackFilePath != null) {
         await _gpxRecorder.appendLocation(
@@ -473,14 +474,14 @@ class LiveTrackerService extends ChangeNotifier {
           location: update.rawLocation,
           sequence: _firebaseSequence,
           sentAt: sentAt,
-          matchedLocation: point['matched'] as Map<String, dynamic>?,
-          segmentEvidence: point['segmentEvidence'] as Map<String, dynamic>?,
+          matchedLocation: matchedLocation,
+          segmentEvidence: segmentEvidence,
         );
       }
       await _firebaseClient.writeTrackPoint(
         session: _firebaseSession!,
         authToken: '',
-        point: point,
+        point: firebasePoint,
         sequence: _firebaseSequence,
         sentAt: sentAt,
       );
