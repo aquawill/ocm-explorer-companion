@@ -696,6 +696,7 @@ flutter pub get
 flutter analyze --no-pub
 flutter devices
 flutter run --dart-define-from-file=.env/dev.json
+flutter run --release --dart-define-from-file=.env/dev.json
 flutter build apk --debug --dart-define-from-file=.env/dev.json
 flutter build ios --dart-define-from-file=.env/dev.json
 ```
