@@ -312,7 +312,7 @@ iOS:
 
 ```bash
 git clone <this-repository-url>
-cd here-sdk-ref-app-flutter
+cd ocm-explorer-companion
 ```
 
 If the repository already exists, update submodules:
