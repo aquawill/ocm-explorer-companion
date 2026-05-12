@@ -1,7 +1,5 @@
 # OCM Explorer Companion
 
-[Traditional Chinese README](./README_TW.md)
-
 OCM Explorer Companion is a Flutter mobile app extended from the HERE SDK Reference Application for Flutter. It keeps the original reference app features for maps, search, routing, navigation, and offline maps, and adds the live tracking, map matching, OCM segment evidence, GPX recording, and remote location relay features needed by OCM Explorer.
 
 This README is intended to:
