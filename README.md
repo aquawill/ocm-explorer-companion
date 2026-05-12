@@ -463,30 +463,27 @@ For a production release APK or Play Store publishing, change the `applicationId
 ### 1. Configure Xcode Signing
 
 1. Connect the iPhone by USB.
-2. Trust this computer on the iPhone.
-3. Enable Developer Mode if iOS asks for it.
-4. Open:
-
-   ```text
-   ios/Runner.xcworkspace
-   ```
-
-5. Select the `Runner` target in Xcode.
-6. Open `Signing & Capabilities`.
+2. Tap **Trust This Computer** on the iPhone if prompted.
+3. Enable **Developer Mode** if iOS asks for it.
+4. Open `ios/Runner.xcworkspace` in Xcode.
+5. Select the **Runner** target.
+6. Open **Signing & Capabilities**.
 7. Select your Apple development team.
-8. Change the bundle identifier to a unique value that you own.
+8. Change the bundle identifier to a unique value you control.
 
-The current bundle identifier in this project is:
+Current bundle identifier:
 
 ```text
 org.self.ocm-live-tracker
 ```
 
-You may want to change it to something like:
+Example:
 
 ```text
 com.yourname.ocm-explorer-companion
 ```
+
+If iOS shows a developer trust warning, open **Settings > VPN & Device Management** and trust the developer certificate/profile.
 
 ### 2. Confirm Flutter Can See the iPhone
 
@@ -494,25 +491,33 @@ com.yourname.ocm-explorer-companion
 flutter devices
 ```
 
-You should see your iPhone.
-
-### 3. Run and Install
-
-From the repository root:
+### 3. Run a Debug Build
 
 ```bash
 flutter run -d <IOS_DEVICE_ID> --dart-define-from-file=.env/dev.json
 ```
 
-If signing is configured correctly, Flutter will build, install, and launch the app.
+This installs and launches a debug build for development.
 
-If the iPhone shows a developer trust warning, open iOS Settings and trust your Apple ID or team developer profile.
+Note:
+- On iOS, a Flutter debug build may not reopen correctly from the Home Screen after it is closed.
+- If that happens, run the command again or use Xcode to launch it.
 
-### 4. Build iOS Without Launching
+### 4. Run a Release Build for Manual Relaunch Testing
+
+```bash
+flutter run -d <IOS_DEVICE_ID> --release --dart-define-from-file=.env/dev.json
+```
+
+Use this when you want to test behavior closer to a normal installed app, including manually reopening it from the Home Screen.
+
+### 5. Build Without Launching
 
 ```bash
 flutter build ios --dart-define-from-file=.env/dev.json
 ```
+    
+This command only builds the iOS app. It does not install or launch it on the iPhone.
 
 For TestFlight or App Store distribution, use Xcode Archive and follow the standard iOS signing / provisioning flow.
 
